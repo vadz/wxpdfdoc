@@ -167,6 +167,8 @@ wxPdfDCImpl::Init()
   m_ppiPdfFont = screendc.GetPPI().GetHeight();
   m_mappingModeStyle = wxPDF_MAPMODESTYLE_STANDARD;
 
+  m_cachedRGB = 0;
+
   m_jpegFormat = false;
   m_jpegQuality = 75;
 
@@ -592,7 +594,7 @@ void
 wxPdfDCImpl::DoDrawSpline(const wxPointList* points)
 {
   wxCHECK_RET(m_pdfDocument, wxS("Invalid PDF DC"));
-  SetPen( m_pen );
+  SetupPen();
   wxASSERT_MSG( points, wxS("NULL pointer to spline points?") );
   wxASSERT_MSG( points->GetCount() > 2 , wxS("incomplete list of spline points?") );
 #if 0
@@ -921,9 +923,64 @@ wxPdfDCImpl::DoDrawRotatedText(const wxString& text, wxCoord x, wxCoord y, doubl
   CalculateFontMetrics(&desc, fontToUse->GetPointSize(), &height, NULL, &descent, NULL);
   y += (height - abs(descent));
 
-  m_pdfDocument->SetTextColour(m_textForegroundColour.Red(), m_textForegroundColour.Green(), m_textForegroundColour.Blue());
+  if (m_cachedPdfColour.GetColourType() == wxPDF_COLOURTYPE_UNKNOWN ||
+      m_textForegroundColour.GetRGB() != m_cachedRGB)
+  {
+    m_cachedRGB = m_textForegroundColour.GetRGB();
+    m_cachedPdfColour.SetColour(wxColour(m_cachedRGB));
+  }
+  if (m_cachedPdfColour != m_pdfDocument->GetTextColour())
+  {
+    m_pdfDocument->SetTextColour(m_cachedPdfColour);
+  }
+
   m_pdfDocument->SetFontSize(ScaleFontSizeToPdf(fontToUse->GetPointSize()));
-  m_pdfDocument->RotatedText(ScaleLogicalToPdfX(x), ScaleLogicalToPdfY(y), ScaleLogicalToPdfX(x), ScaleLogicalToPdfY(originalY), text, angle);
+
+  // Get extent of whole text.
+  wxCoord w, h, heightLine;
+  GetOwner()->GetMultiLineTextExtent(text, &w, &h, &heightLine);
+
+  // Compute the shift for the origin of the next line.
+  static double pi = 4. * atan(1.0);
+  const double rad = (angle * pi) / 180.0;
+  const double dx = heightLine * sin(rad);
+  const double dy = heightLine * cos(rad);
+
+  // Extract all text lines
+  const wxArrayString lines = wxSplit(text, '\n', '\0');
+
+  // Draw background for all text lines
+  if (m_backgroundMode != wxTRANSPARENT && m_textBackgroundColour.Ok())
+  {
+    if (angle != 0)
+    {
+      m_pdfDocument->StartTransform();
+      m_pdfDocument->Rotate(angle, ScaleLogicalToPdfX(x), ScaleLogicalToPdfY(originalY));
+    }
+    wxBrush previousBrush = GetBrush();
+    SetBrush(wxBrush(m_textBackgroundColour));
+    SetupBrush();
+    // draw rectangle line by line
+    for (size_t lineNum = 0; lineNum < lines.size(); lineNum++)
+    {
+      DoGetTextExtent(lines[lineNum], &w, &h);
+      m_pdfDocument->Rect(ScaleLogicalToPdfX(x), ScaleLogicalToPdfY(originalY + wxRound(lineNum*heightLine)), ScaleLogicalToPdfX(w), ScaleLogicalToPdfY(h), wxPDF_STYLE_FILL);
+    }
+    SetBrush(previousBrush);
+    if (angle != 0)
+    {
+      m_pdfDocument->StopTransform();
+    }
+  }
+
+  // Draw all text line by line
+  for (size_t lineNum = 0; lineNum < lines.size(); lineNum++)
+  {
+    // Calculate origin for each line to avoid accumulation of rounding errors.
+    m_pdfDocument->RotatedText(ScaleLogicalToPdfX(x + wxRound(lineNum*dx)), ScaleLogicalToPdfY(y + wxRound(lineNum*dy)), 
+                               ScaleLogicalToPdfX(x + wxRound(lineNum*dx)), ScaleLogicalToPdfY(originalY + wxRound(lineNum*dy)), lines[lineNum], angle);
+  }
+
   SetFont(old);
 }
 
