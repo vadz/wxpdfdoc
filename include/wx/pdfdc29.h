@@ -218,6 +218,8 @@ private:
   int FindPdfFont(wxFont* font) const;
   void SetupPen();
   void SetupBrush();
+  void SetupAlpha();
+  void SetupTextAlpha();
   void CalculateFontMetrics(wxPdfFontDescription* desc, int pointSize,
                             int* height, int* ascent, int* descent, int* extLeading) const;
 
