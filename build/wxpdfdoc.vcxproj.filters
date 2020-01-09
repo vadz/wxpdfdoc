@@ -307,6 +307,9 @@
     <ClInclude Include="..\include\wx\pdfxml.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\wx\pdfdoc_version.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\src\pdfcjkfontdata.inc">
