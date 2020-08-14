@@ -369,7 +369,7 @@ void
 wxPdfDCImpl::SetBackgroundMode(int mode)
 {
   // TODO: check implementation
-  m_backgroundMode = (mode == wxTRANSPARENT) ? wxTRANSPARENT : wxSOLID;
+  m_backgroundMode = (mode == wxBRUSHSTYLE_TRANSPARENT) ? wxBRUSHSTYLE_TRANSPARENT : wxBRUSHSTYLE_SOLID;
 }
 
 void
